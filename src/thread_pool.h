@@ -21,13 +21,14 @@ struct thread_pool {
 };
 
 struct task *new_task(void (*run)(void *arg), void *arg);
+void free_task(struct task *task);
 
 struct thread_pool *new_thread_pool(int core_size, 
                                     int max_size, 
 									struct blocking_queue *queue);
 
 void execute(struct thread_pool *pool, struct task *task);
-void shutdown(struct thread_pool *pool);
+void shut_down(struct thread_pool *pool);
 
 void free_thread_pool(struct thread_pool *pool);
 

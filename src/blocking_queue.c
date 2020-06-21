@@ -1,5 +1,6 @@
 #include "blocking_queue.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 struct blocking_queue *new_blocking_queue(int capacity) {
     struct blocking_queue *queue = malloc(sizeof(struct blocking_queue));
@@ -16,6 +17,7 @@ struct blocking_queue *new_blocking_queue(int capacity) {
 }
 
 int bq_push(struct blocking_queue *queue, void *data) {
+    printf("bq_push()\n");
     pthread_mutex_lock(&(queue->mutex));
     if (queue->size < queue->capacity) {
         struct queue_node *node = calloc(1, sizeof(struct queue_node));
@@ -48,6 +50,7 @@ int bq_push(struct blocking_queue *queue, void *data) {
 }
 
 void *bq_take(struct blocking_queue *queue) {
+    printf("bq_task()\n");
     pthread_mutex_lock(&(queue->mutex));
     
     // 循环判断，TODO：说明为什么需要循环判断

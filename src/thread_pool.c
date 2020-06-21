@@ -2,7 +2,7 @@
 #include "blocking_queue.h"
 #include <stdlib.h>
 #include <pthread.h>
-
+#include <stdio.h>
 
 struct worker {
 	pthread_t tid;
@@ -17,11 +17,15 @@ struct task *new_task(void (*run)(void *arg), void *arg) {
 	if (t == NULL) {
 		return NULL;
 	}
-	
+
 	t->run = run;
 	t->arg = arg;
 
 	return t;
+}
+
+void free_task(struct task *task) {
+	free(task);
 }
 
 struct thread_pool *new_thread_pool(int core_size,
@@ -50,24 +54,30 @@ struct thread_pool *new_thread_pool(int core_size,
 }
 
 static void *__run(void *arg) {
+	printf("__run()\n");
 	struct worker *worker = (struct worker *)arg;
 	struct thread_pool *pool = worker->pool;
 	struct task *task = worker->first_task;
 
 	while (task != NULL || (task = bq_take(pool->queue)) != NULL) {
+		printf("%ld 执行任务\n", pthread_self());
 		task->run(task->arg);
 		worker->completed_tasks++;
+		task = NULL;
 	}
-
+	printf("worker 结束\n");
 	return NULL;
 }
 
 static int __run_work(struct worker *worker) {
+	printf("__run_worker()\n");
 	return pthread_create(&(worker->tid), NULL, __run, worker);
 }
 
 static int __add_worker(struct thread_pool *pool, struct task *task) {
+	printf("__add_worker()\n");
 	pthread_mutex_lock(&(pool->mutex));
+	printf("current_size: %d\n", pool->current_size);
 	if (pool->current_size < pool->core_size) {
 		struct worker *worker = malloc(sizeof(struct worker));
 
@@ -84,12 +94,9 @@ static int __add_worker(struct thread_pool *pool, struct task *task) {
 			return -1;
 		}
 		pool->current_size++;
-	}
-
-    // 队列满
-	if (-1 == bq_push(pool->queue, task)) {
+	} else if (-1 == bq_push(pool->queue, task)) { // 队列满
 		// TODO: 创建超过core_size数量的新线程
-
+		printf("队列满\n");
 	}
 
 	pthread_mutex_unlock(&(pool->mutex));
@@ -98,14 +105,16 @@ static int __add_worker(struct thread_pool *pool, struct task *task) {
 
 
 void execute(struct thread_pool *pool, struct task *task) {
+	printf("execute()\n");
 	__add_worker(pool, task);
 }
 
-void shutdown(struct thread_pool *pool) {
+void shut_down(struct thread_pool *pool) {
 	int i = 0;
 	for (; i < pool->core_size; i++) {
 		if (pool->core_workers[i] != NULL) {
 			struct worker *worker = pool->core_workers[i];
+			printf("work%ld\n", worker->tid);
 			pthread_cancel(worker->tid);
 		} 
 	}
@@ -113,6 +122,7 @@ void shutdown(struct thread_pool *pool) {
 	for (i = 0; i < pool->max_size - pool->core_size; i++) {
 		if (pool->other_workers[i] != NULL) {
 			struct worker *worker = pool->other_workers[i];
+			printf("%ld\n", worker->tid);
 			pthread_cancel(worker->tid);
 		}
 	}
