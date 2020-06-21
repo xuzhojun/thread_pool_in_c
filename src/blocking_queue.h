@@ -1,6 +1,8 @@
 #ifndef __BLOCKING_QUEUE_H__
 #define __BLOCKING_QUEUE_H__
 
+#include <pthread.h>
+
 /**
  * 
  * 
@@ -22,10 +24,13 @@ struct queue_node {
  */ 
 struct blocking_queue {
     int capacity;
-    int size;
+    volatile int size;
 
     struct queue_node *head;
     struct queue_node *tail;
+
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
 };
 
 /**
@@ -65,7 +70,7 @@ void *bq_take(struct blocking_queue *queue);
  * 
  * @param queue 阻塞的消息队列
  * 
- * @return NULL - 获取数据失败
+ * @return NULL - 没有数据
  *         非NULL - 返回void *类型的数据
  */
 void *bq_offer(struct blocking_queue *queue);
@@ -81,7 +86,8 @@ void *bq_offer(struct blocking_queue *queue);
 int bq_size(struct blocking_queue *queue);
 
 /**
- * 释放队列，必须是调用new_blocking_queue创建的队列
+ * 释放队列，必须是调用new_blocking_queue创建的队列.
+ * free之前应该确保队列里的数据已经全部取出，否则队列里外部数据动态申请的内存空间将不会释放
  * 
  * @param queue 阻塞的消息队列
  */

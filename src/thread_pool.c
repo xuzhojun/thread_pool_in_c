@@ -20,7 +20,7 @@ struct thread_pool *new_thread_pool(int core_size,
 
 	pool->queue = queue;
 	pool->core_workers = calloc(core_size, sizeof(void *));
-	pool->other_workers = calloc(max_size - core_size, sizoef(void *));
+	pool->other_workers = calloc(max_size - core_size, sizeof(void *));
 
 	return pool;
 }
@@ -61,6 +61,7 @@ void execute(struct thread_pool *pool, struct task *task) {
 }
 
 void shutdown(struct thread_pool *pool) {
+	
 
 }
 

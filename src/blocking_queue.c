@@ -9,10 +9,14 @@ struct blocking_queue *new_blocking_queue(int capacity) {
 
     queue->head = queue->tail = NULL;
 
+    pthread_mutex_init(&(queue->mutex), NULL);
+    pthread_cond_init(&(queue->cond), NULL);
+
     return queue;
 }
 
 int bq_push(struct blocking_queue *queue, void *data) {
+    pthread_mutex_lock(&(queue->mutex));
     if (queue->size < queue->capacity) {
         struct queue_node *node = calloc(1, sizeof(struct queue_node));
         if (node == NULL) {
@@ -31,14 +35,42 @@ int bq_push(struct blocking_queue *queue, void *data) {
         }
         queue->size++;
 
+        pthread_cond_signal(&(queue->cond));
+
+        pthread_mutex_unlock(&(queue->mutex));
+
         return 0;
     }
+
+    pthread_mutex_unlock(&(queue->mutex));
 
     return -1;
 }
 
 void *bq_take(struct blocking_queue *queue) {
-    return queue->head;
+    pthread_mutex_lock(&(queue->mutex));
+    
+    // 循环判断，TODO：说明为什么需要循环判断
+    while (queue->size == 0) {
+        pthread_cond_wait(&(queue->cond), &(queue->mutex));
+    }
+
+    queue->size--;
+    struct queue_node *node = queue->head;
+    if (queue->tail == queue->head) {
+        queue->tail = NULL;
+        queue->head = NULL;
+    } else {
+        queue->head = queue->head->next;
+        queue->head->pre = NULL;
+    }
+    
+    node->next = NULL;
+    void *data = node->data;
+    free(node);
+    pthread_mutex_unlock(&(queue->mutex));
+
+    return data;
 }
 
 void *bq_offer(struct blocking_queue *queue) {
