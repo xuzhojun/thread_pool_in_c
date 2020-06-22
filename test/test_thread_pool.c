@@ -10,23 +10,25 @@ typedef struct task task_t;
 
 static void __run(void *arg) {
     printf("run output : %d\n", *(int *)arg);
+    free(arg);
 }
 
 int main() {
-    bq_t *queue = new_blocking_queue(10);
-    tp_t *pool = new_thread_pool(3, 5, queue);
+    bq_t *queue = new_blocking_queue(50);
+    tp_t *pool = tp_new_thread_pool(3, 3, queue, NULL);
 
     int i;
 
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < 50; i++) {
         int *g = malloc(sizeof(int));
         *g = i;
-        task_t *task = new_task(__run, g);
-        execute(pool, task);
+        tp_execute(pool, __run, g);
     }
     printf("任务添加完毕\n");
     sleep(10);
-    shut_down(pool);
+    tp_shut_down(pool);
+    tp_free_thread_pool(pool);
+    free_blocking_queue(queue);
 
     return 0;
 }

@@ -4,8 +4,8 @@
 #include <pthread.h>
 
 /**
- * 
- * 
+ * 一个用链表实现的阻塞队列，
+ * 用互斥锁实现多线程操作的互斥
  * 
  * @auth xuzhojun  
  */

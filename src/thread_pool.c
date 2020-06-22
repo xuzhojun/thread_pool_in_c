@@ -4,6 +4,11 @@
 #include <pthread.h>
 #include <stdio.h>
 
+struct task {
+	void (*run)(void *arg);
+	void *arg;
+};
+
 struct worker {
 	pthread_t tid;
 	struct thread_pool *pool;
@@ -12,7 +17,7 @@ struct worker {
 	int completed_tasks;
 };
 
-struct task *new_task(void (*run)(void *arg), void *arg) {
+static struct task *__new_task(void (*run)(void *arg), void *arg) {
 	struct task *t = malloc(sizeof(struct task));
 	if (t == NULL) {
 		return NULL;
@@ -28,9 +33,10 @@ void free_task(struct task *task) {
 	free(task);
 }
 
-struct thread_pool *new_thread_pool(int core_size,
+struct thread_pool *tp_new_thread_pool(int core_size,
                         int max_size,
-						struct blocking_queue *queue) {
+						struct blocking_queue *queue,
+						void (*abort_policy)(void *)) {
 	struct thread_pool *pool = malloc(sizeof(struct thread_pool));
 	if (pool == NULL) {
 		return NULL;
@@ -48,6 +54,8 @@ struct thread_pool *new_thread_pool(int core_size,
 	pool->core_workers = calloc(core_size, sizeof(void *));
 	pool->other_workers = calloc(max_size - core_size, sizeof(void *));
 
+	pool->abort_policy = abort_policy;
+
 	pthread_mutex_init(&(pool->mutex), NULL);
 
 	return pool;
@@ -63,6 +71,7 @@ static void *__run(void *arg) {
 		printf("%ld 执行任务\n", pthread_self());
 		task->run(task->arg);
 		worker->completed_tasks++;
+		free_task(task);
 		task = NULL;
 	}
 	printf("worker 结束\n");
@@ -74,10 +83,20 @@ static int __run_work(struct worker *worker) {
 	return pthread_create(&(worker->tid), NULL, __run, worker);
 }
 
+static void __reject(struct thread_pool *pool, struct task *task) {
+	pool->abort_policy(task->arg);
+	free_task(task);
+}
+
+static int __add_extend_worker(struct thread_pool *pool, struct task *task) {
+
+	return 0;
+}
+
 static int __add_worker(struct thread_pool *pool, struct task *task) {
 	printf("__add_worker()\n");
 	pthread_mutex_lock(&(pool->mutex));
-	printf("current_size: %d\n", pool->current_size);
+
 	if (pool->current_size < pool->core_size) {
 		struct worker *worker = malloc(sizeof(struct worker));
 
@@ -97,6 +116,12 @@ static int __add_worker(struct thread_pool *pool, struct task *task) {
 	} else if (-1 == bq_push(pool->queue, task)) { // 队列满
 		// TODO: 创建超过core_size数量的新线程
 		printf("队列满\n");
+		// 不能创建新线程
+		if (pool->current_size == pool->max_size) {
+			__reject(pool, task);
+		} else {
+			__add_extend_worker(pool, task);
+		}
 	}
 
 	pthread_mutex_unlock(&(pool->mutex));
@@ -104,18 +129,25 @@ static int __add_worker(struct thread_pool *pool, struct task *task) {
 }
 
 
-void execute(struct thread_pool *pool, struct task *task) {
+void tp_execute(struct thread_pool *pool, void (*run)(void *), void *arg) {
 	printf("execute()\n");
+
+	struct task *task = malloc(sizeof(struct task));
+	task->run = run;
+	task->arg = arg;
+
 	__add_worker(pool, task);
 }
 
-void shut_down(struct thread_pool *pool) {
+void tp_shut_down(struct thread_pool *pool) {
 	int i = 0;
 	for (; i < pool->core_size; i++) {
 		if (pool->core_workers[i] != NULL) {
 			struct worker *worker = pool->core_workers[i];
 			printf("work%ld\n", worker->tid);
+
 			pthread_cancel(worker->tid);
+			free(worker);
 		} 
 	}
 
@@ -124,10 +156,11 @@ void shut_down(struct thread_pool *pool) {
 			struct worker *worker = pool->other_workers[i];
 			printf("%ld\n", worker->tid);
 			pthread_cancel(worker->tid);
+			free(worker);
 		}
 	}
 }
 
-void free_thread_pool(struct thread_pool *pool) {
+void tp_free_thread_pool(struct thread_pool *pool) {
 	free(pool);
 }

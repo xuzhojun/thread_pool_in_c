@@ -27,13 +27,13 @@ int bq_push(struct blocking_queue *queue, void *data) {
         node->data = data;
 
         node->pre = queue->tail;
+        queue->tail = node;
         node->next = NULL;
 
-        if (queue->head == NULL && queue->tail == NULL) {
+        if (node->pre == NULL) {
             queue->head = node;
-            queue->tail = node;
         } else {
-            queue->tail = node;    
+            node->pre->next = node;    
         }
         queue->size++;
 
@@ -54,24 +54,25 @@ void *bq_take(struct blocking_queue *queue) {
     pthread_mutex_lock(&(queue->mutex));
     
     // 循环判断，TODO：说明为什么需要循环判断
+    // 防止唤醒了多个线程，队列的元素已经被取走
     while (queue->size == 0) {
         pthread_cond_wait(&(queue->cond), &(queue->mutex));
     }
 
     queue->size--;
     struct queue_node *node = queue->head;
-    if (queue->tail == queue->head) {
+    queue->head = node->next;
+
+    if (queue->head == NULL) {
         queue->tail = NULL;
-        queue->head = NULL;
     } else {
-        queue->head = queue->head->next;
         queue->head->pre = NULL;
     }
-    
+    pthread_mutex_unlock(&(queue->mutex));
+
     node->next = NULL;
     void *data = node->data;
     free(node);
-    pthread_mutex_unlock(&(queue->mutex));
 
     return data;
 }
