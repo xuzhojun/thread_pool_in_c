@@ -3,19 +3,7 @@
 
 #include "blocking_queue.h"
 
-struct thread_pool {
-	int core_size;
-	int max_size;
-	int current_size;
-
-	struct blocking_queue *queue;
-	void **core_workers;
-	void **other_workers;
-
-	pthread_mutex_t mutex;
-
-	void (*abort_policy)(void *arg);
-};
+typedef struct thread_pool thread_pool_t;
 
 /**
  * 创建一个线程池的结构体，供后续的执行函数使用
@@ -29,15 +17,32 @@ struct thread_pool {
  * @return NULL - 创建线程池失败
  *         非NULL - 创建线程池成功
  */
-struct thread_pool *tp_new_thread_pool(int core_size, 
+thread_pool_t *tp_new_thread_pool(int core_size, 
                                     int max_size, 
 									struct blocking_queue *queue,
 									void (*abort_policy)(void *arg));
 
-void tp_execute(struct thread_pool *pool, void (*run)(void *), void *arg);
-void tp_shut_down(struct thread_pool *pool);
+/**
+ * 调用线程池执行任务
+ *
+ * @param pool 线程池句柄
+ * @param run 需要线程执行的函数
+ * @param arg run函数的参数
+ *
+ */
+void tp_execute(thread_pool_t *pool, void (*run)(void *), void *arg);
 
-void tp_free_thread_pool(struct thread_pool *pool);
+/**
+ * 关闭线程池，关闭所有线程，取消队列里的任务
+ *
+ * @param pool 线程池
+ */
+void tp_shut_down(thread_pool_t *pool);
+
+/**
+ * 释放线程池
+ */
+void tp_free_thread_pool(thread_pool_t *pool);
 
 
 

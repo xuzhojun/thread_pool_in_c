@@ -2,8 +2,31 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-struct blocking_queue *new_blocking_queue(int capacity) {
-    struct blocking_queue *queue = malloc(sizeof(struct blocking_queue));
+/**
+ * 队列的数据节点
+ */
+typedef struct queue_node {
+    struct queue_node *pre;
+    struct queue_node *next;
+    void *data;
+} queue_node_t;
+
+/**
+ * 队列指针，队列里数据采用链表形式存储
+ */ 
+struct blocking_queue {
+    int capacity;
+    volatile int size;
+
+    struct queue_node *head;
+    struct queue_node *tail;
+
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+};
+
+blocking_queue_t *bq_new_blocking_queue(int capacity) {
+    blocking_queue_t *queue = malloc(sizeof(blocking_queue_t));
 
     queue->capacity = capacity;
     queue->size = 0;
@@ -16,7 +39,7 @@ struct blocking_queue *new_blocking_queue(int capacity) {
     return queue;
 }
 
-int bq_push(struct blocking_queue *queue, void *data) {
+int bq_push(blocking_queue_t *queue, void *data) {
     printf("bq_push()\n");
     pthread_mutex_lock(&(queue->mutex));
     if (queue->size < queue->capacity) {
@@ -37,25 +60,27 @@ int bq_push(struct blocking_queue *queue, void *data) {
         }
         queue->size++;
 
+	printf("queue size %d\n", queue->size);
         pthread_cond_signal(&(queue->cond));
-
         pthread_mutex_unlock(&(queue->mutex));
 
         return 0;
     }
 
+    pthread_cond_signal(&(queue->cond));
     pthread_mutex_unlock(&(queue->mutex));
 
     return -1;
 }
 
-void *bq_take(struct blocking_queue *queue) {
-    printf("bq_task()\n");
+void *bq_take(blocking_queue_t *queue) {
+    printf("bq_take()\n");
     pthread_mutex_lock(&(queue->mutex));
     
-    // 循环判断，TODO：说明为什么需要循环判断
+    // 循环判断
     // 防止唤醒了多个线程，队列的元素已经被取走
     while (queue->size == 0) {
+        printf("loop check queue->size %d\n", queue->size);
         pthread_cond_wait(&(queue->cond), &(queue->mutex));
     }
 
@@ -68,23 +93,25 @@ void *bq_take(struct blocking_queue *queue) {
     } else {
         queue->head->pre = NULL;
     }
+
     pthread_mutex_unlock(&(queue->mutex));
 
     node->next = NULL;
     void *data = node->data;
+    printf("before free node\n");
     free(node);
 
     return data;
 }
 
-void *bq_offer(struct blocking_queue *queue) {
+void *bq_offer(blocking_queue_t *queue) {
     return queue->tail;
 }
 
-int bq_size(struct blocking_queue *queue) {
+int bq_size(blocking_queue_t *queue) {
     return queue->size;
 }
 
-void free_blocking_queue(struct blocking_queue *queue) {
+void bq_free_blocking_queue(blocking_queue_t *queue) {
     free(queue);
 }

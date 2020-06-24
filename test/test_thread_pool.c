@@ -4,18 +4,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-typedef struct blocking_queue bq_t;
-typedef struct thread_pool tp_t;
-typedef struct task task_t;
-
 static void __run(void *arg) {
     printf("run output : %d\n", *(int *)arg);
     free(arg);
 }
 
 int main() {
-    bq_t *queue = new_blocking_queue(50);
-    tp_t *pool = tp_new_thread_pool(3, 3, queue, NULL);
+    blocking_queue_t *queue = bq_new_blocking_queue(50);
+    thread_pool_t *pool = tp_new_thread_pool(3, 3, queue, NULL);
 
     int i;
 
@@ -24,11 +20,14 @@ int main() {
         *g = i;
         tp_execute(pool, __run, g);
     }
+
     printf("任务添加完毕\n");
+
     sleep(10);
+
     tp_shut_down(pool);
     tp_free_thread_pool(pool);
-    free_blocking_queue(queue);
+    bq_free_blocking_queue(queue);
 
     return 0;
 }

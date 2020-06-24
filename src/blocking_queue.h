@@ -10,28 +10,8 @@
  * @auth xuzhojun  
  */
 
-/**
- * 队列的数据节点
- */
-struct queue_node {
-    struct queue_node *pre;
-    struct queue_node *next;
-    void *data;
-};
 
-/**
- * 队列指针，队列里数据采用链表形式存储
- */ 
-struct blocking_queue {
-    int capacity;
-    volatile int size;
-
-    struct queue_node *head;
-    struct queue_node *tail;
-
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-};
+typedef struct blocking_queue blocking_queue_t;
 
 /**
  * 创建指定容量大小的队列，返回的队列，用于之后对队列操作的参数
@@ -41,7 +21,7 @@ struct blocking_queue {
  * @return  NULL - 创建队列失败
  *          非NULL - 指向队列的指针
  */ 
-struct blocking_queue *new_blocking_queue(int capacity);
+blocking_queue_t *bq_new_blocking_queue(int capacity);
 
 /**
  * 如果消息队列大小小于capacity，则在队列尾部插入数据，否则返回错误
@@ -53,7 +33,7 @@ struct blocking_queue *new_blocking_queue(int capacity);
  *         -1 - 队列满
  *         -2 - 申请节点内存空间失败
  */
-int bq_push(struct blocking_queue *queue, void *data);
+int bq_push(blocking_queue_t *queue, void *data);
 
 /**
  * 从消息队列头部取数据，取出成功则把队列里的节点删除
@@ -63,7 +43,7 @@ int bq_push(struct blocking_queue *queue, void *data);
  * @return NULL - 获取数据失败
  *         非NULL - 返回void *类型的数据
  */
-void *bq_take(struct blocking_queue *queue);
+void *bq_take(blocking_queue_t *queue);
 
 /**
  * 从消息队列头部取数据，不删除节点
@@ -73,7 +53,7 @@ void *bq_take(struct blocking_queue *queue);
  * @return NULL - 没有数据
  *         非NULL - 返回void *类型的数据
  */
-void *bq_offer(struct blocking_queue *queue);
+void *bq_offer(blocking_queue_t *queue);
 
 /**
  * 返回当前队列大小
@@ -83,7 +63,7 @@ void *bq_offer(struct blocking_queue *queue);
  * @return NULL - 获取数据失败
  *         非NULL - 返回void *类型的数据
  */
-int bq_size(struct blocking_queue *queue);
+int bq_size(blocking_queue_t *queue);
 
 /**
  * 释放队列，必须是调用new_blocking_queue创建的队列.
@@ -91,7 +71,7 @@ int bq_size(struct blocking_queue *queue);
  * 
  * @param queue 阻塞的消息队列
  */
-void free_blocking_queue(struct blocking_queue *queue);
+void bq_free_blocking_queue(blocking_queue_t *queue);
 
 
 #endif
