@@ -5,12 +5,20 @@
 #include <pthread.h>
 
 #define is_empty(queue) (queue->size == 0)
-#define not_full(queue) (queue->size < queue->capacity)
+#define is_full(queue) (queue->size == queue->capacity)
 
-#define signal_not_empty(queue)
-#define signal_not_full(queue) 
-#define lock_queue(queue)
-#define unlock_queue(queue)
+
+#define wait_not_full() pthread_cond_wait(&(queue->not_full_cond), &(queue->mutex))
+#define wait_not_empty() pthread_cond_wait(&(queue->not_empty_cond), &(queue->mutex))
+#define wait_not_full_time(timeout) \
+                pthread_cond_timewait(&(queue->not_full_cond), &(queue->mutex), timeout)
+#define wait_not_empty_time(timeout) \
+                pthread_cond_timewait(&(queue->not_empty_cond), &(queue->mutex), timeout)
+#define signal_not_empty() pthread_cond_signal(&(queue->not_empty_cond))
+#define signal_not_full() pthread_cond_signal(&(queue->not_full_cond))
+#define lock_queue()  pthread_mutex_lock(&(queue->mutex))
+#define unlock_queue() pthread_mutex_unlock(&(queue->mutex))
+
 
 /**
  * 队列的数据节点
@@ -32,7 +40,8 @@ struct blocking_queue {
     struct queue_node *tail;
 
     pthread_mutex_t mutex;
-    pthread_cond_t cond;
+    pthread_cond_t not_full_cond;
+    pthread_cond_t not_empty_cond;
 };
 
 blocking_queue_t *bq_new_blocking_queue(int capacity) {
@@ -44,59 +53,150 @@ blocking_queue_t *bq_new_blocking_queue(int capacity) {
     queue->head = queue->tail = NULL;
 
     pthread_mutex_init(&(queue->mutex), NULL);
-    pthread_cond_init(&(queue->cond), NULL);
+    pthread_cond_init(&(queue->not_full_cond), NULL);
+    pthread_cond_init(&(queue->not_empty_cond), NULL);
 
     return queue;
 }
 
-int bq_push(blocking_queue_t *queue, void *data) {
-    printf("bq_push()\n");
+int bq_put(blocking_queue_t *queue, void *data) {
+    printf("bq_put()\n");
+
+    int ret;
+
     // 防止线程退出时未释放锁
-    pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *) &(queue->mutex));
-    pthread_mutex_lock(&(queue->mutex));
-    if (queue->size < queue->capacity) {
-        struct queue_node *node = calloc(1, sizeof(struct queue_node));
-        if (node == NULL) {
-            return -2;
-        }
-        node->data = data;
-
-        node->pre = queue->tail;
-        queue->tail = node;
-        node->next = NULL;
-
-        if (node->pre == NULL) {
-            queue->head = node;
-        } else {
-            node->pre->next = node;    
-        }
-        queue->size++;
-
-	    printf("queue size %d\n", queue->size);
-        pthread_cond_signal(&(queue->cond));
-        pthread_mutex_unlock(&(queue->mutex));
-        pthread_cleanup_pop(0);
-
-        return 0;
+    // pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *) &(queue->mutex));
+    lock_queue();
+    while (is_full(queue)) {
+        wait_not_full();
     }
 
-    pthread_cond_signal(&(queue->cond));
-    pthread_mutex_unlock(&(queue->mutex));
-    pthread_cleanup_pop(0);
+    struct queue_node *node = calloc(1, sizeof(struct queue_node));
+    if (node == NULL) {
+        ret = -2;
+        goto END;
+    }
+    node->data = data;
 
-    return -1;
+    node->pre = queue->tail;
+    queue->tail = node;
+    node->next = NULL;
+
+    if (node->pre == NULL) {
+        queue->head = node;
+    } else {
+        node->pre->next = node;    
+    }
+    queue->size++;
+    ret = 0;
+
+	printf("queue size %d\n", queue->size);
+    signal_not_empty();
+
+END:
+    unlock_queue();
+    // pthread_cleanup_pop(0);
+
+    return ret;
+}
+
+int bq_offer(blocking_queue_t *queue, void *data) {
+    printf("bq_put()\n");
+
+    int ret;
+    // 防止线程退出时未释放锁，和pop成对在同一代码层级出现
+    // pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *) &(queue->mutex));
+    lock_queue();
+
+    if (is_full(queue)) {
+        ret = -1;
+        goto END;
+    }
+
+    struct queue_node *node = calloc(1, sizeof(struct queue_node));
+    if (node == NULL) {
+        ret = -2;
+        goto END;
+    }
+    node->data = data;
+
+    node->pre = queue->tail;
+    queue->tail = node;
+    node->next = NULL;
+
+    if (node->pre == NULL) {
+        queue->head = node;
+    } else {
+        node->pre->next = node;    
+    }
+    queue->size++;
+    ret = 0;
+
+	printf("queue size %d\n", queue->size);
+    signal_not_empty();
+
+END:
+    unlock_queue();
+    // pthread_cleanup_pop(0);
+
+    return ret;
+}
+
+int bq_offer_time(blocking_queue_t *queue, void *data, int timeout) {
+    printf("bq_put()\n");
+    int ret;
+    // 防止线程退出时未释放锁
+    // pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *) &(queue->mutex));
+    lock_queue();
+    if (is_full(queue)) {
+        // TODO: 计算超时时间
+        struct timeval timeout; 
+        wait_not_full_time(timeout);
+    }
+
+    if (is_full(queue)) {
+        ret = -1;
+        goto END;
+    }
+
+    struct queue_node *node = calloc(1, sizeof(struct queue_node));
+    if (node == NULL) {
+        ret = -2;
+        goto END;
+    }
+    node->data = data;
+
+    node->pre = queue->tail;
+    queue->tail = node;
+    node->next = NULL;
+
+    if (node->pre == NULL) {
+        queue->head = node;
+    } else {
+        node->pre->next = node;    
+    }
+    queue->size++;
+    ret = 0;
+
+	printf("queue size %d\n", queue->size);
+    signal_not_empty();
+
+END:
+    unlock_queue();
+    // pthread_cleanup_pop(0);
+    return ret;
 }
 
 void *bq_take(blocking_queue_t *queue) {
     printf("bq_take()\n");
-    pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *)&(queue->mutex));
-    pthread_mutex_lock(&(queue->mutex));
+    // pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *)&(queue->mutex));
+    lock_queue();
     
     // 循环判断
     // 防止唤醒了多个线程，队列的元素已经被取走
     while (queue->size == 0) {
         printf("loop check queue->size %d\n", queue->size);
-        pthread_cond_wait(&(queue->cond), &(queue->mutex));
+        wait_not_empty();
     }
 
     queue->size--;
@@ -109,8 +209,8 @@ void *bq_take(blocking_queue_t *queue) {
         queue->head->pre = NULL;
     }
 
-    pthread_mutex_unlock(&(queue->mutex));
-    pthread_cheanup_pop(0);
+    unlock_queue();
+    // pthread_cheanup_pop(0);
 
     node->next = NULL;
     void *data = node->data;
@@ -120,15 +220,11 @@ void *bq_take(blocking_queue_t *queue) {
     return data;
 }
 
-void *bq_offer(blocking_queue_t *queue) {
-    return queue->tail;
-}
-
 int bq_size(blocking_queue_t *queue) {
     int size;
-    pthread_mutex_lock(&(queue->mutex));
+    lock_queue();
     size = queue->size;
-    pthread_mutex_unlock(&(queue->mutex));
+    unlock_queue();
 
     return size;
 }

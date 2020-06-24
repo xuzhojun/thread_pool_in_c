@@ -29,19 +29,20 @@ blocking_queue_t *bq_new_blocking_queue(int capacity);
  * @param data 需要入队的数据
  * 
  * @return 0 - 入队成功
- *         -1 - 队列满
  *         -2 - 申请节点内存空间失败
+ *
  */
 int bq_put(blocking_queue_t *queue, void *data);
 
 
 /**
- * 插入数据，没有空间插入的时候立即返回 -1
+ * 插入数据，没有空间插入空间的时候立即返回 -1
  * 
  * @param queue 阻塞队列
  * @param data  需要入队的数据
  * 
  * @return -1 - 队列满，插入失败
+ *         -2 - 申请节点空间失败
  *         0 - 插入数据成功
  */
 int bq_offer(blocking_queue_t *queue, void *data);
@@ -54,6 +55,7 @@ int bq_offer(blocking_queue_t *queue, void *data);
  * @param timeout 超时时间，单位微秒（microsecond）
  * 
  * @return -1 - 队列满，插入失败
+ *         -2 - 申请节点空间失败
  *         0 - 插入数据成功
  */
 int bq_offer_time(blocking_queue_t *queue, void *data, int timeout);
