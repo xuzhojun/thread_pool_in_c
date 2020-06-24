@@ -6,12 +6,13 @@
 
 static void __run(void *arg) {
     printf("run output : %d\n", *(int *)arg);
+
     free(arg);
 }
 
 int main() {
-    blocking_queue_t *queue = bq_new_blocking_queue(50);
-    thread_pool_t *pool = tp_new_thread_pool(3, 3, queue, NULL);
+    blocking_queue_t *queue = bq_new_blocking_queue(1);
+    thread_pool_t *pool = tp_new_thread_pool(1, 1, queue, NULL);
 
     int i;
 

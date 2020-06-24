@@ -2,6 +2,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <pthread.h>
+
+#define is_empty(queue) (queue->size == 0)
+#define not_full(queue) (queue->size < queue->capacity)
+
+#define signal_not_empty(queue)
+#define signal_not_full(queue) 
+#define lock_queue(queue)
+#define unlock_queue(queue)
+
 /**
  * 队列的数据节点
  */
@@ -41,6 +51,8 @@ blocking_queue_t *bq_new_blocking_queue(int capacity) {
 
 int bq_push(blocking_queue_t *queue, void *data) {
     printf("bq_push()\n");
+    // 防止线程退出时未释放锁
+    pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *) &(queue->mutex));
     pthread_mutex_lock(&(queue->mutex));
     if (queue->size < queue->capacity) {
         struct queue_node *node = calloc(1, sizeof(struct queue_node));
@@ -60,21 +72,24 @@ int bq_push(blocking_queue_t *queue, void *data) {
         }
         queue->size++;
 
-	printf("queue size %d\n", queue->size);
+	    printf("queue size %d\n", queue->size);
         pthread_cond_signal(&(queue->cond));
         pthread_mutex_unlock(&(queue->mutex));
+        pthread_cleanup_pop(0);
 
         return 0;
     }
 
     pthread_cond_signal(&(queue->cond));
     pthread_mutex_unlock(&(queue->mutex));
+    pthread_cleanup_pop(0);
 
     return -1;
 }
 
 void *bq_take(blocking_queue_t *queue) {
     printf("bq_take()\n");
+    pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *)&(queue->mutex));
     pthread_mutex_lock(&(queue->mutex));
     
     // 循环判断
@@ -95,6 +110,7 @@ void *bq_take(blocking_queue_t *queue) {
     }
 
     pthread_mutex_unlock(&(queue->mutex));
+    pthread_cheanup_pop(0);
 
     node->next = NULL;
     void *data = node->data;
@@ -109,7 +125,12 @@ void *bq_offer(blocking_queue_t *queue) {
 }
 
 int bq_size(blocking_queue_t *queue) {
-    return queue->size;
+    int size;
+    pthread_mutex_lock(&(queue->mutex));
+    size = queue->size;
+    pthread_mutex_unlock(&(queue->mutex));
+
+    return size;
 }
 
 void bq_free_blocking_queue(blocking_queue_t *queue) {
