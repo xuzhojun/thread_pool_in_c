@@ -127,7 +127,7 @@ static int __add_worker(thread_pool_t *pool, task_t *task) {
 			return -1;
 		}
 		pool->current_size++;
-	} else if (-1 == bq_push(pool->queue, task)) { // 队列满
+	} else if (-1 == bq_put(pool->queue, task)) { // 队列满
 		// TODO: 创建超过core_size数量的新线程
 		printf("队列满\n");
 		// 不能创建新线程

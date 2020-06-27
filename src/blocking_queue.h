@@ -1,6 +1,9 @@
 #ifndef __BLOCKING_QUEUE_H__
 #define __BLOCKING_QUEUE_H__
 
+
+#include <unistd.h>
+
 /**
  * 一个用链表实现的阻塞队列，
  * 用互斥锁实现多线程操作的互斥
@@ -58,7 +61,7 @@ int bq_offer(blocking_queue_t *queue, void *data);
  *         -2 - 申请节点空间失败
  *         0 - 插入数据成功
  */
-int bq_offer_time(blocking_queue_t *queue, void *data, int timeout);
+int bq_offer_time(blocking_queue_t *queue, void *data, size_t timeout);
 
 
 /**
@@ -100,7 +103,7 @@ void *bq_poll(blocking_queue_t *queue);
  * @return NULL - 获取数据失败
  *         非NULL - 成功取到的数据
  */
-void *bq_poll_time(blocking_queue_t *queue, int timeout);
+void *bq_poll_time(blocking_queue_t *queue, size_t timeout);
 
 /**
  * 返回当前队列大小

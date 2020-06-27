@@ -1,1 +1,3 @@
 test/test_thread_pool
+test/test_blocking_queue
+test/bq_performance_test
