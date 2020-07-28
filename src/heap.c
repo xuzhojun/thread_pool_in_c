@@ -6,17 +6,17 @@
 #define LEFT(i) (2 * i + 1)
 #define RIGHT(i) (2 * i + 2)
 
-#define DEFAULT_CAPACITY 16
+#define DEFAULT_CAPACITY 7
 
-struct heap *create_heap(int capacity,
+struct heap *create_heap(int init_capacity,
                          int (*compare)(const void *v1, const void *v2)) {
 	struct heap *heap = calloc(1, sizeof(struct heap));
 	if (heap == NULL) {
 		return NULL;
 	}
-	heap->capacity = capacity < DEFAULT_CAPACITY ? DEFAULT_CAPACITY : capacity;
+	heap->capacity = init_capacity < DEFAULT_CAPACITY ? DEFAULT_CAPACITY : init_capacity;
 	heap->size = 0;
-	heap->array = calloc(capacity, sizeof(void *));
+	heap->array = calloc(heap->capacity, sizeof(void *));
 	if (heap->array == NULL) {
 		free(heap);
 		return NULL;
@@ -45,9 +45,9 @@ static void shift_up(struct heap *heap, int curr) {
 
 static void shift_down(struct heap *heap, int curr) {
 	while (curr < heap->size - 1) {
-		if (heap->array[LEFT(curr)] != NULL 
+		if (LEFT(curr) < heap->capacity && heap->array[LEFT(curr)] != NULL 
             && heap->compare(heap->array[curr], heap->array[LEFT(curr)]) < 0) {
-			if (heap->array[RIGHT(curr)] != NULL 
+			if (RIGHT(curr) < heap->capacity && heap->array[RIGHT(curr)] != NULL 
                 && heap->compare(heap->array[curr], heap->array[RIGHT(curr)]) < 0) {
 				if (heap->compare(heap->array[LEFT(curr)], heap->array[RIGHT(curr)]) < 0) {
 					exchange_item(heap, curr, RIGHT(curr));
@@ -57,7 +57,7 @@ static void shift_down(struct heap *heap, int curr) {
 			}
 			exchange_item(heap, curr, LEFT(curr));
 			curr = LEFT(curr);
-		} else if (heap->array[RIGHT(curr)] != NULL 
+		} else if (RIGHT(curr) < heap->capacity && heap->array[RIGHT(curr)] != NULL 
                    && heap->compare(heap->array[curr], heap->array[RIGHT(curr)]) < 0) {
 			exchange_item(heap, curr, RIGHT(curr));
 			curr = RIGHT(curr);
@@ -68,12 +68,15 @@ static void shift_down(struct heap *heap, int curr) {
 }
 
 static int resize_heap(struct heap *heap) {
-	void *tmp = realloc(heap->array, heap->capacity >> 1);
+	printf("resize ");
+	void *tmp = realloc(heap->array, (heap->capacity << 1) * sizeof(void *));
 	if (tmp == NULL) {
 		return -1;
 	}
+
 	heap->array = tmp;
-	heap->capacity >>= 1;
+	heap->capacity <<= 1;
+	printf("cap : %d\n", heap->capacity);
 	return 0;
 }
 
